@@ -1,9 +1,9 @@
-;;; xlsx-to-csv.el --- Convert .xlsx files to .csv using pure Elisp -*- lexical-binding: t -*-
+;;; xlsx-to-csv.el --- Convert .xlsx files to .csv using pure Elisp -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2025 Your Name
 
 ;; Author: William Theesfeld <william@theesfeld.net>
-;; Version: 0.2
+;; Version: 0.3
 ;; Keywords: files, data, spreadsheet, dired
 ;; Package-Requires: ((emacs "30.1"))
 
@@ -14,15 +14,16 @@
 
 ;;; Commentary:
 
-;; This package converts .xlsx files to .csv files using only built-in Emacs 30.1
-;; functionality. It reads all sheets, supports Dired integration, and provides
-;; programmatic access. Each sheet is exported as a separate .csv file. Extensive
-;; error checking ensures graceful failure with clear feedback.
-
+;; This package converts .xlsx files to .csv files using only built-in
+;; Emacs 30.1 functionality. It reads all sheets, supports Dired
+;; integration, and provides programmatic access. Each sheet is exported
+;; as a separate .csv file. Extensive error checking ensures graceful
+;; failure with clear feedback.
+;;
 ;; Usage:
-;; - Interactive: M-x xlsx-to-csv-convert-file RET /path/to/file.xlsx RET
-;; - In Dired: Mark .xlsx files, then M-x dired-do-xlsx-to-csv RET
-;; - Programmatic: (xlsx-to-csv-convert-file "/path/to/file.xlsx")
+;; - Interactive: `M-x xlsx-to-csv-convert-file RET /path/to/file.xlsx RET`
+;; - In Dired: Mark .xlsx files, then `M-x dired-do-xlsx-to-csv RET`
+;; - Programmatic: `(xlsx-to-csv-convert-file "/path/to/file.xlsx")`
 
 ;;; Code:
 
@@ -31,7 +32,8 @@
 (require 'dired) ;; For Dired integration
 
 (defun xlsx-to-csv--extract-to-buffer (archive file-name)
-  "Extract FILE-NAME from ARCHIVE to a temporary buffer and return the buffer or nil."
+  "Extract FILE-NAME from ARCHIVE to a temporary buffer.
+Return the buffer or nil if extraction fails."
   (condition-case err
       (with-temp-buffer
         (let ((archive-buffer
@@ -60,7 +62,8 @@
      nil)))
 
 (defun xlsx-to-csv--parse-shared-strings (xlsx-file)
-  "Parse shared strings from XLSX-FILE's sharedStrings.xml into a list or nil."
+  "Parse shared strings from XLSX-FILE's sharedStrings.xml.
+Return a list of strings or nil on failure."
   (condition-case err
       (let* ((buffer
               (xlsx-to-csv--extract-to-buffer
@@ -86,7 +89,8 @@
      nil)))
 
 (defun xlsx-to-csv--get-sheets (xlsx-file)
-  "Return a list of (sheet-num . sheet-name) from XLSX-FILE's workbook.xml or nil."
+  "Return a list of (sheet-num . sheet-name) from XLSX-FILE's workbook.xml.
+Return nil if parsing fails."
   (condition-case err
       (let* ((buffer
               (xlsx-to-csv--extract-to-buffer
@@ -118,7 +122,8 @@
      nil)))
 
 (defun xlsx-to-csv--cell-to-coords (cell-ref)
-  "Convert CELL-REF (e.g., 'A1') to (row . col) coordinates or nil."
+  "Convert CELL-REF (e.g., \"A1\") to (row . col) coordinates.
+Return nil if conversion fails."
   (condition-case err
       (let* ((col-str (replace-regexp-in-string "[0-9]+" "" cell-ref))
              (row-str (replace-regexp-in-string "[A-Z]+" "" cell-ref))
@@ -140,7 +145,8 @@
      nil)))
 
 (defun xlsx-to-csv--parse-sheet (xlsx-file sheet-num shared-strings)
-  "Parse sheet SHEET-NUM from XLSX-FILE using SHARED-STRINGS into a data structure or nil."
+  "Parse sheet SHEET-NUM from XLSX-FILE using SHARED-STRINGS.
+Return a data structure or nil on failure."
   (condition-case err
       (let* ((file-name
               (format "xl/worksheets/sheet%d.xml" sheet-num))
@@ -198,7 +204,8 @@
      nil)))
 
 (defun xlsx-to-csv--to-csv (data output-file)
-  "Write DATA (list of lists) to OUTPUT-FILE in CSV format, return t on success or nil."
+  "Write DATA (list of lists) to OUTPUT-FILE in CSV format.
+Return t on success, nil on failure."
   (condition-case err
       (progn
         (unless (file-writable-p (file-name-directory output-file))
@@ -227,7 +234,8 @@
      nil)))
 
 (defun xlsx-to-csv-convert-file (file)
-  "Convert .xlsx FILE to .csv files and return the list of output file paths or nil."
+  "Convert .xlsx FILE to .csv files.
+Return the list of output file paths or nil on failure."
   (interactive "fXLSX file: ")
   (condition-case err
       (progn
@@ -259,7 +267,7 @@
                   (message
                    "Skipping sheet %d (%s) due to write failure"
                    sheet-num sheet-name)))))
-          (when (called-interactively-p 'interactive)
+          (when (called-interactively-p `interactive)
             (if output-files
                 (message "Converted %s to %d CSV files: %s"
                          file
