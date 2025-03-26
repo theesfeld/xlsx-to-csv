@@ -37,14 +37,19 @@
         (let ((archive-buffer
                (and (file-exists-p archive)
                     (file-readable-p archive)
-                    (find-file-noselect archive))))
+                    (find-file-noselect archive)))
+              (temp-buffer (current-buffer)))
           (unless archive-buffer
             (error "Cannot open archive %s" archive))
           (with-current-buffer archive-buffer
             (goto-char (point-min))
             (unless (re-search-forward (regexp-quote file-name) nil t)
               (error "File %s not found in archive" file-name))
-            (archive-extract-to-buffer (current-buffer)))
+            (let
+                ((archive-write-file-member nil)) ;; Prevent writing to disk
+              (archive-extract)
+              (switch-to-buffer temp-buffer)
+              (insert-buffer-substring archive-buffer)))
           (kill-buffer archive-buffer)
           (current-buffer)))
     (error
