@@ -3,7 +3,7 @@
 ;; Copyright (C) 2025 Your Name
 
 ;; Author: William Theesfeld <william@theesfeld.net>
-;; Version: 0.4
+;; Version: 0.5
 ;; Keywords: files, data, spreadsheet, dired
 ;; Package-Requires: ((emacs "30.1"))
 
@@ -35,21 +35,19 @@
   "Extract FILE-NAME from ARCHIVE to a temporary buffer.
 Return the buffer or nil if extraction fails."
   (condition-case err
-      (with-temp-buffer
-        (let ((archive-buffer
-               (and (file-exists-p archive)
-                    (file-readable-p archive)
-                    (find-file-noselect archive)))
-              (temp-buffer (current-buffer)))
-          (unless archive-buffer
-            (error "Cannot open archive %s" archive))
-          (with-current-buffer archive-buffer
-            (goto-char (point-min))
-            (unless (re-search-forward (regexp-quote file-name) nil t)
-              (error "File %s not found in archive" file-name))
-            (archive-extract)
-            (switch-to-buffer temp-buffer)
-            (insert-buffer-substring archive-buffer))
+      (let ((archive-buffer
+             (and (file-exists-p archive)
+                  (file-readable-p archive)
+                  (find-file-noselect archive))))
+        (unless archive-buffer
+          (error "Cannot open archive %s" archive))
+        (with-current-buffer archive-buffer
+          (goto-char (point-min))
+          (unless (re-search-forward (regexp-quote file-name) nil t)
+            (error "File %s not found in archive" file-name))
+          (archive-extract))
+        (with-temp-buffer
+          (insert-buffer-substring archive-buffer)
           (kill-buffer archive-buffer)
           (current-buffer)))
     (error
@@ -248,6 +246,8 @@ Return the list of output file paths or nil on failure."
                (output-files '()))
           (unless sheets
             (error "No sheets found in %s" file))
+          (unless shared-strings
+            (error "No shared strings parsed from %s" file))
           (dolist (sheet sheets)
             (let* ((sheet-num (car sheet))
                    (sheet-name (cdr sheet))
