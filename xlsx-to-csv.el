@@ -59,13 +59,13 @@ Return the buffer or nil if extraction fails."
               (error
                "Extracted content for %s is not valid XML"
                file-name)))
-          temp-buffer)))
-  (error
-   (message "Failed to extract %s from %s: %s"
-            file-name
-            archive
-            (error-message-string err))
-   nil))
+          temp-buffer))
+    (error
+     (message "Failed to extract %s from %s: %s"
+              file-name
+              archive
+              (error-message-string err))
+     nil)))
 
 (defun xlsx-to-csv--parse-shared-strings (xlsx-file)
   "Parse shared strings from XLSX-FILE's sharedStrings.xml.
