@@ -99,12 +99,12 @@ git clone https://github.com/theesfeld/xlsx-to-csv.git ~/.emacs.d/lisp/xlsx-to-c
 
 1. **Simple Spreadsheet**:
    - Input: `test.xlsx` with one sheet ("Data"):
-
+```
 | A | B |
-|```+```|
+|---+---|
 | 1 | 2 |
 | 3 | 4 |
-
+```
 - Command: `M-x xlsx-to-csv-convert-file RET ~/test.xlsx RET`
 - Output: `~/test-sheet1-Data.csv`:
 ```bash
