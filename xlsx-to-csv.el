@@ -3,7 +3,7 @@
 ;; Copyright (C) 2025 Your Name
 
 ;; Author: William Theesfeld <william@theesfeld.net>
-;; Version: 0.3
+;; Version: 0.4
 ;; Keywords: files, data, spreadsheet, dired
 ;; Package-Requires: ((emacs "30.1"))
 
@@ -47,11 +47,9 @@ Return the buffer or nil if extraction fails."
             (goto-char (point-min))
             (unless (re-search-forward (regexp-quote file-name) nil t)
               (error "File %s not found in archive" file-name))
-            (let
-                ((archive-write-file-member nil)) ;; Prevent writing to disk
-              (archive-extract)
-              (switch-to-buffer temp-buffer)
-              (insert-buffer-substring archive-buffer)))
+            (archive-extract)
+            (switch-to-buffer temp-buffer)
+            (insert-buffer-substring archive-buffer))
           (kill-buffer archive-buffer)
           (current-buffer)))
     (error
