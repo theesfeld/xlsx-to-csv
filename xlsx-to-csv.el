@@ -1,6 +1,6 @@
 ;;; xlsx-to-csv.el --- Convert .xlsx files to .csv using pure Elisp -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2025 Your Name
+;; Copyright (C) 2025 William Theesfeld
 
 ;; Author: William Theesfeld <william@theesfeld.net>
 ;; Version: 0.6
@@ -27,9 +27,9 @@
 
 ;;; Code:
 
-(require 'arc-mode) ;; For archive handling
-(require 'xml) ;; For XML parsing
-(require 'dired) ;; For Dired integration
+(require 'arc-mode) ; For archive handling
+(require 'xml) ; For XML parsing
+(require 'dired) ; For Dired integration
 
 (defun xlsx-to-csv--extract-to-buffer (archive file-name)
   "Extract FILE-NAME from ARCHIVE to a temporary buffer.
@@ -50,16 +50,15 @@ Return the buffer or nil if extraction fails."
                                          t)
                 (kill-buffer archive-buffer)
                 (error "File %s not found in archive" file-name))
-              (archive-extract) ;; Extracts to archive-buffer
+              (archive-extract) ; Extracts to archive-buffer
               (with-current-buffer temp-buffer
                 (insert-buffer-substring archive-buffer)))
             (kill-buffer archive-buffer)
             (goto-char (point-min))
             (unless (looking-at "<\\?xml")
               (error
-               "Extracted content for %s is not valid XML"
-               file-name)))
-          temp-buffer))
+               "Extracted content for %s is not valid XML" file-name))
+            temp-buffer)))
     (error
      (message "Failed to extract %s from %s: %s"
               file-name
@@ -207,7 +206,7 @@ Return a data structure or nil on failure."
               (dolist (cell (cdr row))
                 (aset row-vec (cdr (car cell)) (or (cdr cell) "")))
               (aset matrix (car row) row-vec)))
-          (mapcar 'vector-to-list (append matrix nil))))
+          (mapcar #'vector-to-list (append matrix nil))))
     (error
      (message "Error parsing sheet %d in %s: %s"
               sheet-num
@@ -281,7 +280,7 @@ Return the list of output file paths or nil on failure."
                   (message
                    "Skipping sheet %d (%s) due to write failure"
                    sheet-num sheet-name)))))
-          (when (called-interactively-p `interactive)
+          (when (called-interactively-p 'interactive)
             (if output-files
                 (message "Converted %s to %d CSV files: %s"
                          file
@@ -311,7 +310,7 @@ Return the list of output file paths or nil on failure."
         (message "Skipping non-.xlsx file: %s" file)))
     (message "Processed %d .xlsx files successfully" success-count)))
 
-(define-key dired-mode-map (kbd "C-c x") 'dired-do-xlsx-to-csv)
+(define-key dired-mode-map (kbd "C-c x") #'dired-do-xlsx-to-csv)
 
 (provide 'xlsx-to-csv)
 ;;; xlsx-to-csv.el ends here
