@@ -27,84 +27,108 @@
 
 ;;; Code:
 
-(require 'arc-mode)  ;; For archive handling
-(require 'xml)       ;; For XML parsing
-(require 'dired)     ;; For Dired integration
+(require 'arc-mode) ;; For archive handling
+(require 'xml) ;; For XML parsing
+(require 'dired) ;; For Dired integration
 
 (defun xlsx-to-csv--extract-to-buffer (archive file-name)
   "Extract FILE-NAME from ARCHIVE to a temporary buffer.
 Return the buffer or nil if extraction fails."
   (condition-case err
-      (let ((archive-buffer (and (file-exists-p archive)
-                                (file-readable-p archive)
-                                (find-file-noselect archive))))
+      (let ((archive-buffer
+             (and (file-exists-p archive)
+                  (file-readable-p archive)
+                  (find-file-noselect archive))))
         (unless archive-buffer
           (error "Cannot open archive %s" archive))
         (with-temp-buffer
           (let ((temp-buffer (current-buffer)))
             (with-current-buffer archive-buffer
               (goto-char (point-min))
-              (unless (re-search-forward (regexp-quote file-name) nil t)
+              (unless (re-search-forward (regexp-quote file-name)
+                                         nil
+                                         t)
                 (kill-buffer archive-buffer)
                 (error "File %s not found in archive" file-name))
-              (archive-extract)  ;; Extracts to archive-buffer
+              (archive-extract) ;; Extracts to archive-buffer
               (with-current-buffer temp-buffer
                 (insert-buffer-substring archive-buffer)))
             (kill-buffer archive-buffer)
             (goto-char (point-min))
             (unless (looking-at "<\\?xml")
-              (error "Extracted content for %s is not valid XML" file-name)))
+              (error
+               "Extracted content for %s is not valid XML"
+               file-name)))
           temp-buffer)))
-    (error
-     (message "Failed to extract %s from %s: %s"
-              file-name archive (error-message-string err))
-     nil)))
+  (error
+   (message "Failed to extract %s from %s: %s"
+            file-name
+            archive
+            (error-message-string err))
+   nil))
 
 (defun xlsx-to-csv--parse-shared-strings (xlsx-file)
   "Parse shared strings from XLSX-FILE's sharedStrings.xml.
 Return a list of strings or nil on failure."
   (condition-case err
-      (let* ((buffer (xlsx-to-csv--extract-to-buffer xlsx-file "xl/sharedStrings.xml"))
-             (xml-tree (and buffer
-                           (with-current-buffer buffer
-                             (libxml-parse-xml-region (point-min) (point-max)))))
+      (let* ((buffer
+              (xlsx-to-csv--extract-to-buffer
+               xlsx-file "xl/sharedStrings.xml"))
+             (xml-tree
+              (and buffer
+                   (with-current-buffer buffer
+                     (libxml-parse-xml-region
+                      (point-min) (point-max)))))
              (strings '()))
         (unless xml-tree
-          (when buffer (kill-buffer buffer))
+          (when buffer
+            (kill-buffer buffer))
           (error "Failed to parse sharedStrings.xml"))
         (dolist (si (xml-get-children xml-tree 'si))
           (let ((t-node (car (xml-get-children si 't))))
             (push (or (car (xml-node-children t-node)) "") strings)))
-        (when buffer (kill-buffer buffer))
+        (when buffer
+          (kill-buffer buffer))
         (nreverse strings))
     (error
      (message "Error parsing shared strings in %s: %s"
-              xlsx-file (error-message-string err))
+              xlsx-file
+              (error-message-string err))
      nil)))
 
 (defun xlsx-to-csv--get-sheets (xlsx-file)
   "Return a list of (sheet-num . sheet-name) from XLSX-FILE's workbook.xml.
 Return nil if parsing fails."
   (condition-case err
-      (let* ((buffer (xlsx-to-csv--extract-to-buffer xlsx-file "xl/workbook.xml"))
-             (xml-tree (and buffer
-                           (with-current-buffer buffer
-                             (libxml-parse-xml-region (point-min) (point-max)))))
+      (let* ((buffer
+              (xlsx-to-csv--extract-to-buffer
+               xlsx-file "xl/workbook.xml"))
+             (xml-tree
+              (and buffer
+                   (with-current-buffer buffer
+                     (libxml-parse-xml-region
+                      (point-min) (point-max)))))
              (sheets '()))
         (unless xml-tree
-          (when buffer (kill-buffer buffer))
+          (when buffer
+            (kill-buffer buffer))
           (error "Failed to parse workbook.xml"))
-        (dolist (sheet (xml-get-children (car (xml-get-children xml-tree 'sheets)) 'sheet))
+        (dolist (sheet
+                 (xml-get-children
+                  (car (xml-get-children xml-tree 'sheets)) 'sheet))
           (let ((sheet-id (xml-get-attribute sheet 'sheetId))
                 (sheet-name (xml-get-attribute sheet 'name)))
-            (push (cons (string-to-number sheet-id)
-                        (or sheet-name (format "Sheet%d" sheet-id)))
+            (push (cons
+                   (string-to-number sheet-id)
+                   (or sheet-name (format "Sheet%d" sheet-id)))
                   sheets)))
-        (when buffer (kill-buffer buffer))
+        (when buffer
+          (kill-buffer buffer))
         (nreverse sheets))
     (error
      (message "Error parsing sheets in %s: %s"
-              xlsx-file (error-message-string err))
+              xlsx-file
+              (error-message-string err))
      nil)))
 
 (defun xlsx-to-csv--cell-to-coords (cell-ref)
@@ -113,51 +137,70 @@ Return nil if conversion fails."
   (condition-case err
       (let* ((col-str (replace-regexp-in-string "[0-9]+" "" cell-ref))
              (row-str (replace-regexp-in-string "[A-Z]+" "" cell-ref))
-             (col-num (1- (string-to-number
-                           (mapconcat (lambda (c) (number-to-string (- (upcase c) ?A -1)))
-                                      col-str ""))))
+             (col-num
+              (1- (string-to-number
+                   (mapconcat
+                    (lambda (c)
+                      (number-to-string (- (upcase c) ?A -1)))
+                    col-str
+                    ""))))
              (row-num (1- (string-to-number row-str))))
         (if (and (>= row-num 0) (>= col-num 0))
             (cons row-num col-num)
           (error "Invalid cell reference: %s" cell-ref)))
     (error
      (message "Error converting cell reference %s: %s"
-              cell-ref (error-message-string err))
+              cell-ref
+              (error-message-string err))
      nil)))
 
 (defun xlsx-to-csv--parse-sheet (xlsx-file sheet-num shared-strings)
   "Parse sheet SHEET-NUM from XLSX-FILE using SHARED-STRINGS.
 Return a data structure or nil on failure."
   (condition-case err
-      (let* ((file-name (format "xl/worksheets/sheet%d.xml" sheet-num))
-             (buffer (xlsx-to-csv--extract-to-buffer xlsx-file file-name))
-             (xml-tree (and buffer
-                           (with-current-buffer buffer
-                             (libxml-parse-xml-region (point-min) (point-max)))))
+      (let* ((file-name
+              (format "xl/worksheets/sheet%d.xml" sheet-num))
+             (buffer
+              (xlsx-to-csv--extract-to-buffer xlsx-file file-name))
+             (xml-tree
+              (and buffer
+                   (with-current-buffer buffer
+                     (libxml-parse-xml-region
+                      (point-min) (point-max)))))
              (rows '())
              (max-row 0)
              (max-col 0))
         (unless xml-tree
-          (when buffer (kill-buffer buffer))
+          (when buffer
+            (kill-buffer buffer))
           (error "Failed to parse %s" file-name))
-        (dolist (row (xml-get-children (car (xml-get-children xml-tree 'sheetData)) 'row))
-          (let ((row-num (string-to-number (or (xml-get-attribute row 'r) "1")))
+        (dolist (row
+                 (xml-get-children
+                  (car (xml-get-children xml-tree 'sheetData)) 'row))
+          (let ((row-num
+                 (string-to-number
+                  (or (xml-get-attribute row 'r) "1")))
                 (row-data '()))
             (dolist (c (xml-get-children row 'c))
               (let* ((cell-ref (xml-get-attribute c 'r))
-                     (coords (and cell-ref (xlsx-to-csv--cell-to-coords cell-ref)))
+                     (coords
+                      (and cell-ref
+                           (xlsx-to-csv--cell-to-coords cell-ref)))
                      (v-node (car (xml-get-children c 'v)))
                      (value (car (xml-node-children v-node)))
                      (t-attr (xml-get-attribute c 't)))
                 (when (and coords value)
                   (when (string= t-attr "s")
-                    (setq value (nth (string-to-number value) shared-strings)))
+                    (setq value
+                          (nth
+                           (string-to-number value) shared-strings)))
                   (push (cons coords value) row-data)
                   (setq max-row (max max-row (car coords)))
                   (setq max-col (max max-col (cdr coords))))))
             (when row-data
               (push (cons row-num row-data) rows))))
-        (when buffer (kill-buffer buffer))
+        (when buffer
+          (kill-buffer buffer))
         (let ((matrix (make-vector (1+ max-row) nil)))
           (dolist (row rows)
             (let ((row-vec (make-vector (1+ max-col) nil)))
@@ -167,7 +210,9 @@ Return a data structure or nil on failure."
           (mapcar 'vector-to-list (append matrix nil))))
     (error
      (message "Error parsing sheet %d in %s: %s"
-              sheet-num xlsx-file (error-message-string err))
+              sheet-num
+              xlsx-file
+              (error-message-string err))
      nil)))
 
 (defun xlsx-to-csv--to-csv (data output-file)
@@ -176,18 +221,28 @@ Return t on success, nil on failure."
   (condition-case err
       (progn
         (unless (file-writable-p (file-name-directory output-file))
-          (error "Directory not writable: %s" (file-name-directory output-file)))
+          (error
+           "Directory not writable: %s"
+           (file-name-directory output-file)))
         (with-temp-file output-file
           (dolist (row data)
-            (insert (mapconcat (lambda (cell)
-                                 (if (stringp cell)
-                                     (concat "\"" (replace-regexp-in-string "\"" "\"\"" cell) "\"")
-                                   (or cell "")))
-                               row ","))
+            (insert
+             (mapconcat (lambda (cell)
+                          (if (stringp cell)
+                              (concat
+                               "\""
+                               (replace-regexp-in-string
+                                "\"" "\"\"" cell)
+                               "\"")
+                            (or cell "")))
+                        row
+                        ","))
             (insert "\n")))
         t)
     (error
-     (message "Failed to write CSV %s: %s" output-file (error-message-string err))
+     (message "Failed to write CSV %s: %s"
+              output-file
+              (error-message-string err))
      nil)))
 
 (defun xlsx-to-csv-convert-file (file)
@@ -201,7 +256,8 @@ Return the list of output file paths or nil on failure."
         (unless (string-suffix-p ".xlsx" file)
           (error "File must be a .xlsx file: %s" file))
         (let* ((base-name (file-name-sans-extension file))
-               (shared-strings (xlsx-to-csv--parse-shared-strings file))
+               (shared-strings
+                (xlsx-to-csv--parse-shared-strings file))
                (sheets (xlsx-to-csv--get-sheets file))
                (output-files '()))
           (unless shared-strings
@@ -211,24 +267,35 @@ Return the list of output file paths or nil on failure."
           (dolist (sheet sheets)
             (let* ((sheet-num (car sheet))
                    (sheet-name (cdr sheet))
-                   (data (xlsx-to-csv--parse-sheet file sheet-num shared-strings))
-                   (output-file (format "%s-sheet%d-%s.csv" base-name sheet-num
-                                       (replace-regexp-in-string "[^[:alnum:]]" "_" sheet-name))))
+                   (data
+                    (xlsx-to-csv--parse-sheet
+                     file sheet-num shared-strings))
+                   (output-file
+                    (format "%s-sheet%d-%s.csv"
+                            base-name sheet-num
+                            (replace-regexp-in-string
+                             "[^[:alnum:]]" "_" sheet-name))))
               (when data
                 (if (xlsx-to-csv--to-csv data output-file)
                     (push output-file output-files)
-                  (message "Skipping sheet %d (%s) due to write failure"
-                           sheet-num sheet-name)))))
+                  (message
+                   "Skipping sheet %d (%s) due to write failure"
+                   sheet-num sheet-name)))))
           (when (called-interactively-p `interactive)
             (if output-files
                 (message "Converted %s to %d CSV files: %s"
-                         file (length output-files) (string-join output-files ", "))
-              (message "Failed to convert %s: No CSV files generated" file)))
+                         file
+                         (length output-files)
+                         (string-join output-files ", "))
+              (message "Failed to convert %s: No CSV files generated"
+                       file)))
           (if output-files
               (nreverse output-files)
             nil)))
     (error
-     (message "Error converting %s: %s" file (error-message-string err))
+     (message "Error converting %s: %s"
+              file
+              (error-message-string err))
      nil)))
 
 (defun dired-do-xlsx-to-csv (&optional arg)
@@ -239,7 +306,8 @@ Return the list of output file paths or nil on failure."
     (dolist (file files)
       (if (string-suffix-p ".xlsx" file)
           (let ((result (xlsx-to-csv-convert-file file)))
-            (when result (setq success-count (1+ success-count))))
+            (when result
+              (setq success-count (1+ success-count))))
         (message "Skipping non-.xlsx file: %s" file)))
     (message "Processed %d .xlsx files successfully" success-count)))
 
