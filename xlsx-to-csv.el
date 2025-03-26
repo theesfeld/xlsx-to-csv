@@ -15,10 +15,10 @@
 ;;; Commentary:
 
 ;; This package converts .xlsx files to .csv files using only built-in
-;; Emacs 30.1 functionality. It reads all sheets, supports Dired
-;; integration, and provides programmatic access. Each sheet is exported
-;; as a separate .csv file. Extensive error checking ensures graceful
-;; failure with clear feedback.
+;; Emacs 30.1 functionality. It reads all sheets, supports Dired integration,
+;; and provides programmatic access. Each sheet is exported as a separate
+;; .csv file. Extensive error checking ensures graceful failure with clear
+;; feedback.
 ;;
 ;; Usage:
 ;; - Interactive: `M-x xlsx-to-csv-convert-file RET /path/to/file.xlsx RET`
@@ -298,7 +298,8 @@ Return the list of output file paths or nil on failure."
      nil)))
 
 (defun dired-do-xlsx-to-csv (&optional arg)
-  "Convert marked .xlsx files in Dired to .csv files."
+  "Convert marked .xlsx files in Dired to .csv files.
+ARG is the prefix argument passed by Dired."
   (interactive "P")
   (let ((files (dired-get-marked-files nil arg))
         (success-count 0))
